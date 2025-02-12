@@ -2,21 +2,42 @@
 fn createTargetSpots = (
     local setName = "Light_Set" -- Название набора
     local existingSet = undefined
+    local lightsArray = #() -- Массив для хранения созданных источников
 
     -- Проверяем, существует ли уже selectionSet с таким именем
     for s in selectionSets where s.name == setName do (
         existingSet = s
     )
 
-    if existingSet == undefined then ( -- Если сета нет, создаем источники света
-        local positions = #([0,100,50], [100,0,50], [0,-100,50], [-100,0,50])  -- Координаты источников света
-        local lightsArray = #() -- Массив для хранения созданных источников
+    if existingSet != undefined then (
+        messageBox "Набор 'Light_Set' уже существует. Новые источники света не созданы." title:"Внимание"
+    ) 
+    else 
+    (
 
-        for pos in positions do (
-            local target = Targetobject()  -- Создание цели
-            target.pos = [0,0,0]           -- Установка цели в центр
+        local positions = #([0,500,250], [500,0,250], [0,-500,250], [-500,0,250])  -- Координаты источников света
+        local masterLight = undefined  -- Переменная для хранения главного бокового света
+
+        for i = 1 to positions.count do (
+            local target = TargetObject()  -- Создание цели
+            target.position = [0,0,0]           -- Установка цели в центр
             local spot = TargetSpot target:target -- Создание Target Spot и привязка к цели
-            spot.pos = pos                  -- Установка позиции
+            spot.position = positions[i]        -- Установка позиции
+
+            -- Установка интенсивности света
+            if i == 3 then ( -- Главный источник
+                spot.multiplier = 1.0
+            ) else if i == 2 or i == 4 then ( -- Два боковых (instance)
+                if i == 2 then (
+                    masterLight = spot -- Первый боковой свет станет мастером
+                ) else (
+                    spot.baseObject = masterLight.baseObject -- Делаем инстанс
+                )
+                spot.multiplier = 0.7
+            ) else ( -- Первый источник
+                spot.multiplier = 0.3
+            )
+
             append lightsArray spot         -- Добавляем в массив
             append lightsArray target       -- Добавляем цель в массив
         )
@@ -24,23 +45,48 @@ fn createTargetSpots = (
         if lightsArray.count == 8 then (
             selectionSets[setName] = lightsArray -- Создаем selectionSet
         )
+    )
+)
 
-    ) else (
-        messageBox "Набор 'Light_Set' уже существует. Новые источники света не созданы." title:"Внимание"
+-- Функция запекания Vertex Color через Radiosity
+fn bakeVertexColor = (
+    if selection.count == 0 then (
+        messageBox "Выберите объект для запекания Vertex Color!" title:"Ошибка"
+    )
+
+    -- Включаем Radiosity, если он выключен
+    renderers.current = Default_Scanline_Renderer() -- Убедимся, что Scanline активен
+    if not radiosity.enabled do (
+        radiosity.enabled = true
+        radiosity.computeMode = 1 -- Полный расчет
+    )
+
+    -- Вычисляем Radiosity
+    radiosity.start()
+    while radiosity.isComputing do ( -- Ждем завершения
+        sleep 0.1
+    )
+
+    -- Запекаем Vertex Color
+    for obj in selection do (
+        if classof obj == Editable_Mesh or classof obj == Editable_Poly then (
+            obj.vertexColorType = 0 -- Установка Vertex Color
+            obj.showVertexColors = true -- Отобразить
+            obj.displayVertexColors = true
+        ) else (
+            messageBox ("Объект '" + obj.name + "' не поддерживает запекание Vertex Color.") title:"Ошибка"
+        )
     )
 )
 
 -- Создание интерфейса
 rollout textureMaterialApplicator "BakingPrelight | Malinovka"(
-    -- About
     button btn_about "About" width:92 height:23 align:#right
-    -- Main
     label prgrs_bar_name ""
     progressbar prgrs_bar color:green
-    -- Кнопка создания источников света
     button btnApply "Create Target Spots" width:150 align:#center
+    button btnBakeVC "Bake Vertex Color" width:150 align:#center
     
-    -----------------------ОБРАБОТЧИКИ КНОПОК-----------------------
     on btn_about pressed do (
         rollout rol_meChecker_about "BakingPrelight | Malinovka - About" width:295 (
             label lbl1 "BakingPrelight | Malinovka 1.0" height:17
@@ -57,6 +103,10 @@ rollout textureMaterialApplicator "BakingPrelight | Malinovka"(
 
     on btnApply pressed do (
         createTargetSpots() -- Вызываем функцию создания Target Spot
+    )
+
+    on btnBakeVC pressed do (
+        bakeVertexColor() -- Запекаем Vertex Color
     )
 )
 
