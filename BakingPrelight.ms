@@ -10,73 +10,41 @@ fn createTargetSpots = (
     )
 
     if existingSet != undefined then (
-        messageBox "Набор 'Light_Set' уже существует. Новые источники света не созданы." title:"Внимание"
+        messageBox "Набор источников света уже существует." title:"Ошибка"
     ) 
     else 
     (
+        local positions = #([0,500,200], [500,0,200], [0,-500,200], [-500,0,200])  -- Координаты источников света
+        local lightsArray = #()  -- Массив для хранения источников света
+        local targetsArray = #()  -- Массив для хранения целей
 
-        local positions = #([0,500,250], [500,0,250], [0,-500,250], [-500,0,250])  -- Координаты источников света
-        local masterLight = undefined  -- Переменная для хранения главного бокового света
-
+        -- Создание света и целей
         for i = 1 to positions.count do (
-            local target = TargetObject()  -- Создание цели
-            target.position = [0,0,0]           -- Установка цели в центр
-            local spot = TargetSpot target:target -- Создание Target Spot и привязка к цели
-            spot.position = positions[i]        -- Установка позиции
-
-            -- Установка интенсивности света
-            if i == 3 then ( -- Главный источник
-                spot.multiplier = 1.0
-            ) else if i == 2 or i == 4 then ( -- Два боковых (instance)
-                if i == 2 then (
-                    masterLight = spot -- Первый боковой свет станет мастером
-                ) else (
-                    spot.baseObject = masterLight.baseObject -- Делаем инстанс
-                )
-                spot.multiplier = 0.7
-            ) else ( -- Первый источник
-                spot.multiplier = 0.3
-            )
-
-            append lightsArray spot         -- Добавляем в массив
-            append lightsArray target       -- Добавляем цель в массив
+            local target = TargetObject()  
+            target.position = [0,0,0]       
+            append targetsArray target  -- Добавляем цель в отдельный массив
+            
+            local spot = TargetSpot target:target 
+            spot.position = positions[i]   
+            append lightsArray spot  -- Добавляем источник света в массив
         )
+        
+        lightsArray[1].multiplier = 15.0
+        lightsArray[2].multiplier = 35.0
+        lightsArray[3].multiplier = 50.0
+        lightsArray[4].baseObject = lightsArray[2].baseObject
+        lightsArray[4].multiplier = 35.0
 
-        if lightsArray.count == 8 then (
-            selectionSets[setName] = lightsArray -- Создаем selectionSet
+        if lightsArray.count == 4 then (
+            selectionSets[setName] = lightsArray + targetsArray -- Создаем selectionSet
         )
     )
 )
 
 -- Функция запекания Vertex Color через Radiosity
 fn bakeVertexColor = (
-    if selection.count == 0 then (
-        messageBox "Выберите объект для запекания Vertex Color!" title:"Ошибка"
-    )
-
-    -- Включаем Radiosity, если он выключен
-    renderers.current = Default_Scanline_Renderer() -- Убедимся, что Scanline активен
-    if not radiosity.enabled do (
-        radiosity.enabled = true
-        radiosity.computeMode = 1 -- Полный расчет
-    )
-
-    -- Вычисляем Radiosity
-    radiosity.start()
-    while radiosity.isComputing do ( -- Ждем завершения
-        sleep 0.1
-    )
-
-    -- Запекаем Vertex Color
-    for obj in selection do (
-        if classof obj == Editable_Mesh or classof obj == Editable_Poly then (
-            obj.vertexColorType = 0 -- Установка Vertex Color
-            obj.showVertexColors = true -- Отобразить
-            obj.displayVertexColors = true
-        ) else (
-            messageBox ("Объект '" + obj.name + "' не поддерживает запекание Vertex Color.") title:"Ошибка"
-        )
-    )
+    sceneradiosity.radiosity.reset true true
+    sceneradiosity.radiosity.start()														
 )
 
 -- Создание интерфейса
@@ -110,5 +78,18 @@ rollout textureMaterialApplicator "BakingPrelight | Malinovka"(
     )
 )
 
+fn checkRadiosityAvailability = (
+    if (sceneradiosity.radiosity == undefined) then (
+        messageBox "Включите Radiosity.\n F10 -> Advanced Lighting -> Select Advanced Lighting -> Radiosity" title:"Ошибка"
+        return false
+    )
+    sceneradiosity.radiosity.radFiltering = 3
+    sceneradiosity.radiosity.radDirectFiltering = 10
+    
+    return true
+)
+
 -- Отображение интерфейса
-createdialog textureMaterialApplicator 340 350
+if checkRadiosityAvailability() then (
+    createDialog textureMaterialApplicator 340 130
+)
