@@ -29,11 +29,11 @@ fn createTargetSpots = (
             append lightsArray spot  -- Добавляем источник света в массив
         )
         
-        lightsArray[1].multiplier = 15.0
-        lightsArray[2].multiplier = 35.0
-        lightsArray[3].multiplier = 50.0
+        lightsArray[1].multiplier = 50.0
+        lightsArray[2].multiplier = 75.0
+        lightsArray[3].multiplier = 150.0
         lightsArray[4].baseObject = lightsArray[2].baseObject
-        lightsArray[4].multiplier = 35.0
+        lightsArray[4].multiplier = 75.0
 
         if lightsArray.count == 4 then (
             selectionSets[setName] = lightsArray + targetsArray -- Создаем selectionSet
@@ -43,17 +43,27 @@ fn createTargetSpots = (
 
 -- Функция запекания Vertex Color через Radiosity
 fn bakeVertexColor = (
+    if (sceneradiosity.radiosity == undefined) then (
+        messageBox "Включите Radiosity.\n F10 -> Advanced Lighting -> Select Advanced Lighting -> Radiosity" title:"Ошибка"
+        return false
+    )
+
     sceneradiosity.radiosity.reset true true
     sceneradiosity.radiosity.start()														
+)
+
+-- Функция открытия Vertex Color
+fn assignVertexColor = (
+    try (utilitypanel.openutility Assign_Vertex_Colors) catch()
 )
 
 -- Создание интерфейса
 rollout textureMaterialApplicator "BakingPrelight | Malinovka"(
     button btn_about "About" width:92 height:23 align:#right
     label prgrs_bar_name ""
-    progressbar prgrs_bar color:green
     button btnApply "Create Target Spots" width:150 align:#center
     button btnBakeVC "Bake Vertex Color" width:150 align:#center
+    button btnAssignVC "Assign Vertex Color" width:150 align:#center
     
     on btn_about pressed do (
         rollout rol_meChecker_about "BakingPrelight | Malinovka - About" width:295 (
@@ -76,20 +86,26 @@ rollout textureMaterialApplicator "BakingPrelight | Malinovka"(
     on btnBakeVC pressed do (
         bakeVertexColor() -- Запекаем Vertex Color
     )
+
+    on btnAssignVC pressed do (
+        assignVertexColor() -- Назначаем Vertex Color
+    )
 )
 
 fn checkRadiosityAvailability = (
     if (sceneradiosity.radiosity == undefined) then (
-        messageBox "Включите Radiosity.\n F10 -> Advanced Lighting -> Select Advanced Lighting -> Radiosity" title:"Ошибка"
-        return false
+        macros.run "Render" "AdvLighting_Radiosity"
     )
-    sceneradiosity.radiosity.radFiltering = 3
+
+    SceneRadiosity.radiosity.rmReuseDirectIllumination = on
+    sceneradiosity.radiosity.radFiltering = 2
     sceneradiosity.radiosity.radDirectFiltering = 10
-    
+    sceneradiosity.radiosity.radInitialQuality = 95.0
+    sceneradiosity.radiosity.radSelectionRefineSteps = 5
     return true
 )
 
 -- Отображение интерфейса
 if checkRadiosityAvailability() then (
-    createDialog textureMaterialApplicator 340 130
+    createDialog textureMaterialApplicator 340 150
 )
